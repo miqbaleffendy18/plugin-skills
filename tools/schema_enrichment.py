@@ -53,32 +53,23 @@ def cli():
 )
 def fetch(model_name: str, model_path: Path, profiles_dir: Path | None, no_samples: bool):
     """Fetch column metadata from Databricks and write a manifest JSON."""
-    from connections.dbt import find_project_root, get_default_target, get_model_schema
+    from connections.dbt import find_project_root, get_default_target
     from connections.databricks import get_columns, get_samples
 
     model_dir = model_path.parent
 
-    # Resolve dbt project root, catalog, and schema
+    # Resolve dbt project root and catalog
     project_root = find_project_root(model_path)
     target = get_default_target(project_root, profiles_dir=profiles_dir)
     catalog = target["catalog"]
-    schema = get_model_schema(project_root, model_path)
 
-    if not schema:
-        click.echo(
-            "ERROR: Could not resolve schema for this model from dbt_project.yml. "
-            "Make sure the model's directory has a '+schema' config.",
-            err=True,
-        )
-        sys.exit(1)
-
-    # Fetch columns via dbt show
-    click.echo(f"Fetching columns for {catalog}.{schema}.{model_name} ...")
-    columns = get_columns(catalog, schema, model_name, project_root, profiles_dir)
+    # Fetch columns via dbt show (schema resolved automatically inside)
+    click.echo(f"Fetching columns for '{model_name}' in catalog '{catalog}' ...")
+    columns = get_columns(catalog, model_name, project_root, profiles_dir)
 
     if not columns:
         click.echo(
-            f"ERROR: Model '{model_name}' not found in {catalog}.{schema}.information_schema. "
+            f"ERROR: Model '{model_name}' not found in catalog '{catalog}'. "
             f"Run 'dbt run -s {model_name}' to materialize it first, "
             f"or re-run with --no-samples to generate descriptions from SQL alone.",
             err=True,
@@ -90,7 +81,7 @@ def fetch(model_name: str, model_path: Path, profiles_dir: Path | None, no_sampl
     if not no_samples:
         click.echo("Fetching sample rows ...")
         try:
-            rows = get_samples(catalog, schema, model_name, project_root, profiles_dir, limit=5)
+            rows = get_samples(catalog, model_name, project_root, profiles_dir, limit=5)
             for col in columns:
                 samples_by_column[col["name"]] = [
                     row.get(col["name"]) for row in rows

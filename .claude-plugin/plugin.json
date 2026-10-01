@@ -1,6 +1,6 @@
 {
   "name": "zurich-data-team",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Internal dbt tooling skills for the Zurich data team.",
   "author": {
     "name": "Zurich Data Team"

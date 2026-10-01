@@ -12,19 +12,20 @@ from pathlib import Path
 
 def get_columns(
     catalog: str,
-    schema: str,
     table: str,
     project_root: Path,
     profiles_dir: Path | None = None,
 ) -> list[dict]:
     """Return a list of {name, data_type} dicts for the given table.
 
-    Returns an empty list if the table does not exist in information_schema.
+    Does not filter by schema -- matches table_name across all schemas in the
+    catalog so schema name mismatches never cause false negatives.
+    Returns an empty list if the table is not found.
     """
     sql = (
         f"SELECT column_name, data_type "
         f"FROM {catalog}.information_schema.columns "
-        f"WHERE table_schema = '{schema}' AND table_name = '{table}' "
+        f"WHERE table_name = '{table}' "
         f"ORDER BY ordinal_position"
     )
     rows, headers = _dbt_show(sql, project_root, profiles_dir)
@@ -37,16 +38,43 @@ def get_columns(
 
 def get_samples(
     catalog: str,
-    schema: str,
     table: str,
     project_root: Path,
     profiles_dir: Path | None = None,
     limit: int = 5,
 ) -> list[dict]:
-    """Return up to `limit` rows from the table as a list of column->value dicts."""
+    """Return up to `limit` rows from the table as a list of column->value dicts.
+
+    Looks up the actual schema from information_schema.tables first so the
+    SELECT uses the correct fully-qualified name regardless of dbt schema config.
+    """
+    schema = _resolve_schema(catalog, table, project_root, profiles_dir)
+    if schema is None:
+        raise RuntimeError(
+            f"Table '{table}' not found in catalog '{catalog}'. "
+            "Run 'dbt run' to materialize it first."
+        )
     sql = f"SELECT * FROM {catalog}.{schema}.{table} LIMIT {limit}"
     rows, headers = _dbt_show(sql, project_root, profiles_dir, limit=limit)
     return [dict(zip(headers, row)) for row in rows]
+
+
+def _resolve_schema(
+    catalog: str,
+    table: str,
+    project_root: Path,
+    profiles_dir: Path | None = None,
+) -> str | None:
+    """Look up the actual schema a table lives in via information_schema.tables."""
+    sql = (
+        f"SELECT table_schema "
+        f"FROM {catalog}.information_schema.tables "
+        f"WHERE table_name = '{table}' LIMIT 1"
+    )
+    rows, headers = _dbt_show(sql, project_root, profiles_dir, limit=1)
+    if not rows:
+        return None
+    return rows[0][headers.index("table_schema")]
 
 
 def _dbt_show(
