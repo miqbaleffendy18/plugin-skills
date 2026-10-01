@@ -5,7 +5,7 @@ Commands:
   fetch     -- query Databricks for column metadata and write a manifest JSON
   populate  -- read the manifest JSON and surgically update schema.yml
 
-Run with: uv run schema_enrichment.py <command> <model_name> --model-path <path>
+Run with: python schema_enrichment.py <command> <model_name> --model-path <path>
 """
 
 from __future__ import annotations
