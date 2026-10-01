@@ -61,8 +61,8 @@ The flag also respects the `DBT_PROFILES_DIR` environment variable automatically
 
 This script:
 - Walks up from `MODEL_PATH` to find `dbt_project.yml` (the dbt project root)
-- Reads `dbt_project.yml` and `profiles.yml` to resolve the default target's catalog and schema
-- Runs `dbt show --inline` to query `information_schema.columns` for column names and data types
+- Reads `dbt_project.yml` and `profiles.yml` to resolve the default target's catalog
+- Runs `dbt show --inline` to query `information_schema.columns` for column names and data types (schema is resolved automatically from `information_schema.tables`)
 - Runs `dbt show --inline` to fetch 5 sample rows from the materialized table
 - Writes `<model_name>_manifest.json` in `MODEL_DIR`
 
