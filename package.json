@@ -1,6 +1,6 @@
 {
   "name": "zurich-data-team-plugin",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Internal dbt tooling skills for the Zurich data team."
 }

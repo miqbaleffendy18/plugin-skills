@@ -54,7 +54,7 @@ def get_samples(
             f"Table '{table}' not found in catalog '{catalog}'. "
             "Run 'dbt run' to materialize it first."
         )
-    sql = f"SELECT * FROM {catalog}.{schema}.{table} LIMIT {limit}"
+    sql = f"SELECT * FROM {catalog}.{schema}.{table}"
     rows, headers = _dbt_show(sql, project_root, profiles_dir, limit=limit)
     return [dict(zip(headers, row)) for row in rows]
 
@@ -69,7 +69,7 @@ def _resolve_schema(
     sql = (
         f"SELECT table_schema "
         f"FROM {catalog}.information_schema.tables "
-        f"WHERE table_name = '{table}' LIMIT 1"
+        f"WHERE table_name = '{table}'"
     )
     rows, headers = _dbt_show(sql, project_root, profiles_dir, limit=1)
     if not rows:
