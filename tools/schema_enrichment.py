@@ -58,40 +58,31 @@ def fetch(model_name: str, model_path: Path, profiles_dir: Path | None, no_sampl
 
     model_dir = model_path.parent
 
-    # Resolve dbt target
+    # Resolve dbt project root and target
     project_root = find_project_root(model_path)
     target = get_default_target(project_root, profiles_dir=profiles_dir)
     catalog = target["catalog"]
     schema = target["schema"]
-    warehouse_id = target["warehouse_id"]
 
-    if not warehouse_id:
-        click.echo(
-            "ERROR: Could not determine the Databricks SQL warehouse ID from profiles.yml. "
-            "Make sure 'http_path' is set under your default target.",
-            err=True,
-        )
-        sys.exit(1)
-
-    # Fetch columns
+    # Fetch columns via dbt show
     click.echo(f"Fetching columns for {catalog}.{schema}.{model_name} ...")
-    columns = get_columns(catalog, schema, model_name, warehouse_id)
+    columns = get_columns(catalog, schema, model_name, project_root, profiles_dir)
 
     if not columns:
         click.echo(
             f"ERROR: Model '{model_name}' not found in {catalog}.{schema}.information_schema. "
-            "Run 'dbt run -s {model_name}' to materialize it first, "
-            "or re-run with --no-samples to generate descriptions from SQL alone.",
+            f"Run 'dbt run -s {model_name}' to materialize it first, "
+            f"or re-run with --no-samples to generate descriptions from SQL alone.",
             err=True,
         )
         sys.exit(2)
 
-    # Fetch samples
+    # Fetch samples via dbt show
     samples_by_column: dict[str, list] = {}
     if not no_samples:
         click.echo("Fetching sample rows ...")
         try:
-            rows = get_samples(catalog, schema, model_name, warehouse_id, limit=5)
+            rows = get_samples(catalog, schema, model_name, project_root, profiles_dir, limit=5)
             for col in columns:
                 samples_by_column[col["name"]] = [
                     row.get(col["name"]) for row in rows

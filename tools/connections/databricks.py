@@ -1,19 +1,21 @@
-"""Utilities for querying Databricks via the Databricks CLI.
+"""Utilities for querying Databricks via dbt show --inline.
 
-Requires the Databricks CLI (v0.200+) installed and configured in ~/.databrickscfg.
+Uses the dbt project's existing profile connection -- no separate auth needed.
+Requires dbt 1.5+ (for --inline support).
 """
 
 from __future__ import annotations
 
-import json
 import subprocess
+from pathlib import Path
 
 
 def get_columns(
     catalog: str,
     schema: str,
     table: str,
-    warehouse_id: str,
+    project_root: Path,
+    profiles_dir: Path | None = None,
 ) -> list[dict]:
     """Return a list of {name, data_type} dicts for the given table.
 
@@ -25,54 +27,70 @@ def get_columns(
         f"WHERE table_schema = '{schema}' AND table_name = '{table}' "
         f"ORDER BY ordinal_position"
     )
-    rows, _ = _execute(sql, warehouse_id)
-    return [{"name": row[0], "data_type": row[1]} for row in rows]
+    rows, headers = _dbt_show(sql, project_root, profiles_dir)
+    if not rows:
+        return []
+    col_idx = headers.index("column_name")
+    type_idx = headers.index("data_type")
+    return [{"name": row[col_idx], "data_type": row[type_idx]} for row in rows]
 
 
 def get_samples(
     catalog: str,
     schema: str,
     table: str,
-    warehouse_id: str,
+    project_root: Path,
+    profiles_dir: Path | None = None,
     limit: int = 5,
 ) -> list[dict]:
     """Return up to `limit` rows from the table as a list of column->value dicts."""
     sql = f"SELECT * FROM {catalog}.{schema}.{table} LIMIT {limit}"
-    rows, col_names = _execute(sql, warehouse_id)
-    return [dict(zip(col_names, row)) for row in rows]
+    rows, headers = _dbt_show(sql, project_root, profiles_dir, limit=limit)
+    return [dict(zip(headers, row)) for row in rows]
 
 
-def _execute(sql: str, warehouse_id: str) -> tuple[list[list], list[str]]:
-    """Run SQL via the Databricks CLI and return (rows, column_names)."""
+def _dbt_show(
+    sql: str,
+    project_root: Path,
+    profiles_dir: Path | None = None,
+    limit: int = 500,
+) -> tuple[list[list[str]], list[str]]:
+    """Run `dbt show --inline` and return (rows, column_names)."""
+    cmd = ["dbt", "show", "--inline", sql, "--limit", str(limit)]
+    if profiles_dir:
+        cmd.extend(["--profiles-dir", str(profiles_dir)])
+
     result = subprocess.run(
-        [
-            "databricks", "sql", "statements", "execute",
-            "--statement", sql,
-            "--warehouse-id", warehouse_id,
-            "--wait-timeout", "50s",
-        ],
+        cmd,
         capture_output=True,
         text=True,
+        cwd=str(project_root),
     )
 
     if result.returncode != 0:
         raise RuntimeError(
-            f"Databricks CLI error: {result.stderr.strip() or result.stdout.strip()}"
+            f"dbt show failed:\n{result.stderr.strip() or result.stdout.strip()}"
         )
 
-    data = json.loads(result.stdout)
+    return _parse_table(result.stdout)
 
-    state = data.get("status", {}).get("state", "")
-    if state != "SUCCEEDED":
-        error = data.get("status", {}).get("error", {})
-        raise RuntimeError(
-            f"Query failed ({state}): {error.get('message', 'unknown error')}"
-        )
 
-    rows = data.get("result", {}).get("data_array") or []
-    col_names = [
-        col["name"]
-        for col in data.get("manifest", {}).get("schema", {}).get("columns", [])
+def _parse_table(output: str) -> tuple[list[list[str]], list[str]]:
+    """Parse the pipe-delimited table that dbt show writes to stdout."""
+    table_lines = [
+        line.strip()
+        for line in output.splitlines()
+        if line.strip().startswith("|")
     ]
 
-    return rows, col_names
+    if not table_lines:
+        return [], []
+
+    def split_row(line: str) -> list[str]:
+        return [cell.strip() for cell in line.strip("|").split("|")]
+
+    headers = split_row(table_lines[0])
+    # table_lines[1] is the separator row (| --- | --- |), skip it
+    rows = [split_row(line) for line in table_lines[2:]]
+
+    return rows, headers

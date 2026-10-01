@@ -63,15 +63,9 @@ def get_default_target(project_root: Path, profiles_dir: Path | None = None) -> 
             f"Target '{target_name}' not found under profile '{profile_name}'."
         )
 
-    http_path = target.get("http_path", "")
-    warehouse_id = http_path.rstrip("/").split("/")[-1] if http_path else ""
-
     return {
         "catalog": target.get("catalog", ""),
         "schema": target.get("schema", ""),
-        "host": target.get("host", ""),
-        "http_path": http_path,
-        "warehouse_id": warehouse_id,
     }
 
 

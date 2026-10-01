@@ -32,10 +32,8 @@ If you do not provide a model name, the skill will ask for one.
 
 ## Prerequisites
 
-- Databricks CLI v1.x binary installed and configured (`~/.databrickscfg`) — this is a standalone binary, not a pip package. Install from [Databricks CLI releases](https://github.com/databricks/cli/releases).
+- dbt 1.5+ installed and configured (`dbt_project.yml` + `profiles.yml` pointing at Databricks)
 - Python 3.11 venv with `tools/requirements.txt` installed
-- dbt project with `dbt_project.yml` present
-- `profiles.yml` with your Databricks connection (including `http_path`, `catalog`, `schema`)
 - The model must already be materialized in Databricks (i.e. `dbt run -s <model>` has been run)
 
 ## Setup
@@ -76,6 +74,6 @@ pip install -r tools/requirements.txt
 
 **"Model not found in information_schema"** -- The model has not been materialized in your dev environment. Run `dbt run -s <model_name>` first. The skill will offer to generate descriptions from SQL logic alone if you cannot run the model.
 
-**"Could not determine warehouse ID"** -- Check that `http_path` is set under your default target in `~/.dbt/profiles.yml`.
+**"dbt show failed"** -- Check that `dbt debug` passes in your project directory. The `dbt show --inline` command requires dbt 1.5+.
 
-**"profiles.yml not found"** -- Make sure `~/.dbt/profiles.yml` exists and your profile is configured for Databricks.
+**"profiles.yml not found"** -- Make sure `profiles.yml` exists (default: `~/.dbt/profiles.yml`) and your profile is configured for Databricks. Use `--profiles-dir` if it lives in a custom location.

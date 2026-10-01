@@ -11,8 +11,7 @@ Enriches a dbt model's `schema.yml` with column descriptions. The skill fetches 
 ## Prerequisites
 
 - Python venv with `tools/requirements.txt` installed and activated
-- Databricks CLI v1.x binary installed and configured (`~/.databrickscfg`) — standalone binary, not a pip package
-- dbt project with `dbt_project.yml` and `profiles.yml`
+- dbt 1.5+ installed and configured with `dbt_project.yml` and `profiles.yml` pointing at Databricks
 
 ## Locating the tools script
 
@@ -22,7 +21,7 @@ This SKILL.md is loaded from `skills/dbt-schema-enrichment/` inside the plugin r
 <skill_base_dir>/../../tools/schema_enrichment.py
 ```
 
-Resolve this to a normalized absolute path before running any commands. For example, if the skill base directory is `/home/user/.claude/plugins/cache/zurich-data-team/0.1.2/skills/dbt-schema-enrichment`, the tools script is at `/home/user/.claude/plugins/cache/zurich-data-team/0.1.2/tools/schema_enrichment.py`.
+Resolve this to a normalized absolute path before running any commands. For example, if the skill base directory is `/home/user/.claude/plugins/cache/zurich-data-team/0.1.3/skills/dbt-schema-enrichment`, the tools script is at `/home/user/.claude/plugins/cache/zurich-data-team/0.1.3/tools/schema_enrichment.py`.
 
 Store this resolved path as `TOOLS_SCRIPT` for use throughout the steps below.
 
@@ -62,9 +61,9 @@ The flag also respects the `DBT_PROFILES_DIR` environment variable automatically
 
 This script:
 - Walks up from `MODEL_PATH` to find `dbt_project.yml` (the dbt project root)
-- Reads `dbt_project.yml` and `profiles.yml` to resolve the default target's catalog, schema, and SQL warehouse
-- Queries `<catalog>.information_schema.columns` for column names and data types
-- Fetches 5 sample rows from the materialized table
+- Reads `dbt_project.yml` and `profiles.yml` to resolve the default target's catalog and schema
+- Runs `dbt show --inline` to query `information_schema.columns` for column names and data types
+- Runs `dbt show --inline` to fetch 5 sample rows from the materialized table
 - Writes `<model_name>_manifest.json` in `MODEL_DIR`
 
 **If the script exits with a non-zero code and the error mentions the model is not found in Databricks:**
