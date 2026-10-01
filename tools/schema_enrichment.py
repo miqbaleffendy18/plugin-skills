@@ -53,16 +53,24 @@ def cli():
 )
 def fetch(model_name: str, model_path: Path, profiles_dir: Path | None, no_samples: bool):
     """Fetch column metadata from Databricks and write a manifest JSON."""
-    from connections.dbt import find_project_root, get_default_target
+    from connections.dbt import find_project_root, get_default_target, get_model_schema
     from connections.databricks import get_columns, get_samples
 
     model_dir = model_path.parent
 
-    # Resolve dbt project root and target
+    # Resolve dbt project root, catalog, and schema
     project_root = find_project_root(model_path)
     target = get_default_target(project_root, profiles_dir=profiles_dir)
     catalog = target["catalog"]
-    schema = target["schema"]
+    schema = get_model_schema(project_root, model_path)
+
+    if not schema:
+        click.echo(
+            "ERROR: Could not resolve schema for this model from dbt_project.yml. "
+            "Make sure the model's directory has a '+schema' config.",
+            err=True,
+        )
+        sys.exit(1)
 
     # Fetch columns via dbt show
     click.echo(f"Fetching columns for {catalog}.{schema}.{model_name} ...")

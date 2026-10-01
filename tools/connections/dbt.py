@@ -69,6 +69,49 @@ def get_default_target(project_root: Path, profiles_dir: Path | None = None) -> 
     }
 
 
+def get_model_schema(project_root: Path, model_path: Path) -> str:
+    """Resolve the Databricks schema for a model from dbt_project.yml +schema configs.
+
+    Walks the models config from the most specific subdirectory to the least,
+    returning the first +schema value found. Falls back to an empty string.
+
+    Example: a model at src/models/staging/dim_customers.sql resolves to the
+    +schema set under models.<project_name>.staging in dbt_project.yml.
+    """
+    dbt_project = _load_yaml(project_root / "dbt_project.yml")
+    project_name = dbt_project.get("name", "")
+    model_dirs = dbt_project.get("model-paths", ["models"])
+
+    rel_parts: list[str] | None = None
+    for model_base in model_dirs:
+        base_path = project_root / model_base
+        try:
+            rel_path = model_path.relative_to(base_path)
+            rel_parts = list(rel_path.parts[:-1])  # exclude the filename
+            break
+        except ValueError:
+            continue
+
+    if not rel_parts:
+        return ""
+
+    project_models_config = dbt_project.get("models", {}).get(project_name, {})
+
+    # Try most-specific path first, progressively less specific
+    for depth in range(len(rel_parts), 0, -1):
+        config = project_models_config
+        for part in rel_parts[:depth]:
+            config = config.get(part, {})
+            if not isinstance(config, dict):
+                config = {}
+                break
+        schema = config.get("+schema")
+        if schema:
+            return schema
+
+    return ""
+
+
 def _load_yaml(path: Path) -> dict:
     with open(path) as f:
         return yaml.safe_load(f) or {}
