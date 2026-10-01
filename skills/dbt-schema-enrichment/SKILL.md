@@ -11,7 +11,7 @@ Enriches a dbt model's `schema.yml` with column descriptions. The skill fetches 
 ## Prerequisites
 
 - `databricks` CLI configured (`~/.databrickscfg` with a default profile)
-- `uv` installed and on PATH
+- `uv` installed and on PATH, **or** a Python venv with `tools/requirements.txt` installed and activated
 - dbt project with `dbt_project.yml` and `~/.dbt/profiles.yml`
 
 ## Locating the tools script
@@ -46,11 +46,16 @@ Store the resolved absolute path as `MODEL_PATH`. The directory containing it is
 
 ### 3. Fetch column metadata from Databricks
 
-Run:
+Run the tools script using whichever runner the user has available:
 
-```bash
-uv run "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH"
-```
+- With `uv` (no venv setup needed):
+  ```bash
+  uv run "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH"
+  ```
+- With an activated Python venv:
+  ```bash
+  python "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH"
+  ```
 
 This script:
 - Walks up from `MODEL_PATH` to find `dbt_project.yml` (the dbt project root)
@@ -90,11 +95,16 @@ Write all generated descriptions back into the manifest JSON, replacing the empt
 
 ### 6. Populate schema.yml
 
-Run:
+Run using the same runner as step 3:
 
-```bash
-uv run "$TOOLS_SCRIPT" populate <model_name> --model-path "$MODEL_PATH"
-```
+- With `uv`:
+  ```bash
+  uv run "$TOOLS_SCRIPT" populate <model_name> --model-path "$MODEL_PATH"
+  ```
+- With an activated Python venv:
+  ```bash
+  python "$TOOLS_SCRIPT" populate <model_name> --model-path "$MODEL_PATH"
+  ```
 
 This script reads the manifest and surgically updates `MODEL_DIR/schema.yml`:
 - Creates `schema.yml` from scratch if it does not exist

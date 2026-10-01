@@ -33,10 +33,30 @@ If you do not provide a model name, the skill will ask for one.
 ## Prerequisites
 
 - `databricks` CLI configured (`~/.databrickscfg` with a default profile and token)
-- `uv` installed and on PATH (`pip install uv` or `brew install uv`)
+- Python 3.11 with the tool dependencies installed (see [Setup](#setup) below)
 - dbt project with `dbt_project.yml` present
 - `~/.dbt/profiles.yml` with your Databricks connection (including `http_path`, `catalog`, `schema`)
 - The model must already be materialized in Databricks (i.e. `dbt run -s <model>` has been run)
+
+## Setup
+
+Install the Python dependencies into your existing venv (recommended for corporate environments):
+
+```bash
+# Activate your venv first, then:
+pip install -r tools/requirements.txt
+```
+
+Or, if you have `uv` available and are not behind a corporate proxy:
+
+```bash
+# No setup needed -- uv handles dependencies automatically when the skill runs
+```
+
+> **Corporate TLS note**: If `pip install` fails with a certificate error, add your company's CA bundle:
+> ```bash
+> pip install --cert /path/to/company-ca-bundle.crt -r tools/requirements.txt
+> ```
 
 ## What the skill will NOT change
 
