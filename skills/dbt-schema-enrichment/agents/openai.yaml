@@ -1,0 +1,6 @@
+interface:
+  display_name: "dbt Schema Enrichment"
+  short_description: "Enrich a dbt model's schema.yml with AI-generated column descriptions from Databricks"
+
+policy:
+  allow_implicit_invocation: false

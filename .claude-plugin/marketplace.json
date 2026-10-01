@@ -1,0 +1,16 @@
+{
+  "name": "zurich-data-team",
+  "owner": {
+    "name": "Zurich Data Team"
+  },
+  "description": "Internal dbt tooling skills for the Zurich data team.",
+  "plugins": [
+    {
+      "name": "zurich-data-team",
+      "source": "./",
+      "description": "Internal dbt tooling skills for the Zurich data team.",
+      "category": "engineering",
+      "keywords": ["dbt", "databricks", "schema", "yaml", "data"]
+    }
+  ]
+}

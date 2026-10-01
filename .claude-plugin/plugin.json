@@ -1,0 +1,13 @@
+{
+  "name": "zurich-data-team",
+  "version": "0.1.0",
+  "description": "Internal dbt tooling skills for the Zurich data team.",
+  "author": {
+    "name": "Zurich Data Team"
+  },
+  "license": "UNLICENSED",
+  "keywords": ["dbt", "databricks", "schema", "yaml", "data"],
+  "skills": [
+    "./skills/dbt-schema-enrichment"
+  ]
+}

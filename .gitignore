@@ -1,0 +1,7 @@
+*_manifest.json
+tools/.venv/
+tools/__pycache__/
+tools/connections/__pycache__/
+*.pyc
+node_modules/
+.in_use/
