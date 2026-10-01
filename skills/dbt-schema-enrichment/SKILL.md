@@ -10,9 +10,9 @@ Enriches a dbt model's `schema.yml` with column descriptions. The skill fetches 
 
 ## Prerequisites
 
-- `databricks` CLI configured (`~/.databrickscfg` with a default profile)
-- `uv` installed and on PATH, **or** a Python venv with `tools/requirements.txt` installed and activated
-- dbt project with `dbt_project.yml` and `~/.dbt/profiles.yml`
+- Python venv with `tools/requirements.txt` installed and activated
+- Databricks CLI v1.x binary installed and configured (`~/.databrickscfg`) — standalone binary, not a pip package
+- dbt project with `dbt_project.yml` and `profiles.yml`
 
 ## Locating the tools script
 
@@ -22,7 +22,7 @@ This SKILL.md is loaded from `skills/dbt-schema-enrichment/` inside the plugin r
 <skill_base_dir>/../../tools/schema_enrichment.py
 ```
 
-Resolve this to a normalized absolute path before running any commands. For example, if the skill base directory is `/home/user/.claude/plugins/cache/zurich-data-team/0.1.0/skills/dbt-schema-enrichment`, the tools script is at `/home/user/.claude/plugins/cache/zurich-data-team/0.1.0/tools/schema_enrichment.py`.
+Resolve this to a normalized absolute path before running any commands. For example, if the skill base directory is `/home/user/.claude/plugins/cache/zurich-data-team/0.1.2/skills/dbt-schema-enrichment`, the tools script is at `/home/user/.claude/plugins/cache/zurich-data-team/0.1.2/tools/schema_enrichment.py`.
 
 Store this resolved path as `TOOLS_SCRIPT` for use throughout the steps below.
 
@@ -46,28 +46,23 @@ Store the resolved absolute path as `MODEL_PATH`. The directory containing it is
 
 ### 3. Fetch column metadata from Databricks
 
-Run the tools script using whichever runner the user has available:
-
-- With `uv` (no venv setup needed):
-  ```bash
-  uv run "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH"
-  ```
-- With an activated Python venv:
-  ```bash
-  python "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH"
-  ```
-
-If the user's `profiles.yml` is not in `~/.dbt/` (e.g. it lives in the dbt project directory), add `--profiles-dir <path>`:
+Run:
 
 ```bash
-python "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH" --profiles-dir "$PROJECT_ROOT"
+python "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH"
+```
+
+If `profiles.yml` is not in `~/.dbt/`, pass `--profiles-dir` pointing to its directory:
+
+```bash
+python "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH" --profiles-dir "<profiles_dir>"
 ```
 
 The flag also respects the `DBT_PROFILES_DIR` environment variable automatically if set.
 
 This script:
 - Walks up from `MODEL_PATH` to find `dbt_project.yml` (the dbt project root)
-- Reads `dbt_project.yml` and `~/.dbt/profiles.yml` to resolve the default target's catalog, schema, and SQL warehouse
+- Reads `dbt_project.yml` and `profiles.yml` to resolve the default target's catalog, schema, and SQL warehouse
 - Queries `<catalog>.information_schema.columns` for column names and data types
 - Fetches 5 sample rows from the materialized table
 - Writes `<model_name>_manifest.json` in `MODEL_DIR`
@@ -103,16 +98,11 @@ Write all generated descriptions back into the manifest JSON, replacing the empt
 
 ### 6. Populate schema.yml
 
-Run using the same runner as step 3:
+Run:
 
-- With `uv`:
-  ```bash
-  uv run "$TOOLS_SCRIPT" populate <model_name> --model-path "$MODEL_PATH"
-  ```
-- With an activated Python venv:
-  ```bash
-  python "$TOOLS_SCRIPT" populate <model_name> --model-path "$MODEL_PATH"
-  ```
+```bash
+python "$TOOLS_SCRIPT" populate <model_name> --model-path "$MODEL_PATH"
+```
 
 This script reads the manifest and surgically updates `MODEL_DIR/schema.yml`:
 - Creates `schema.yml` from scratch if it does not exist
