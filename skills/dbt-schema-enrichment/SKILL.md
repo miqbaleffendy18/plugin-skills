@@ -57,6 +57,14 @@ Run the tools script using whichever runner the user has available:
   python "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH"
   ```
 
+If the user's `profiles.yml` is not in `~/.dbt/` (e.g. it lives in the dbt project directory), add `--profiles-dir <path>`:
+
+```bash
+python "$TOOLS_SCRIPT" fetch <model_name> --model-path "$MODEL_PATH" --profiles-dir "$PROJECT_ROOT"
+```
+
+The flag also respects the `DBT_PROFILES_DIR` environment variable automatically if set.
+
 This script:
 - Walks up from `MODEL_PATH` to find `dbt_project.yml` (the dbt project root)
 - Reads `dbt_project.yml` and `~/.dbt/profiles.yml` to resolve the default target's catalog, schema, and SQL warehouse

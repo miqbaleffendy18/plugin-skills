@@ -40,12 +40,18 @@ def cli():
     help="Absolute path to the model's .sql file.",
 )
 @click.option(
+    "--profiles-dir",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Directory containing profiles.yml. Defaults to DBT_PROFILES_DIR or ~/.dbt/.",
+)
+@click.option(
     "--no-samples",
     is_flag=True,
     default=False,
     help="Skip fetching sample rows (use when the model is not yet materialized).",
 )
-def fetch(model_name: str, model_path: Path, no_samples: bool):
+def fetch(model_name: str, model_path: Path, profiles_dir: Path | None, no_samples: bool):
     """Fetch column metadata from Databricks and write a manifest JSON."""
     from connections.dbt import find_project_root, get_default_target
     from connections.databricks import get_columns, get_samples
@@ -54,7 +60,7 @@ def fetch(model_name: str, model_path: Path, no_samples: bool):
 
     # Resolve dbt target
     project_root = find_project_root(model_path)
-    target = get_default_target(project_root)
+    target = get_default_target(project_root, profiles_dir=profiles_dir)
     catalog = target["catalog"]
     schema = target["schema"]
     warehouse_id = target["warehouse_id"]
@@ -123,7 +129,13 @@ def fetch(model_name: str, model_path: Path, no_samples: bool):
     type=click.Path(exists=True, path_type=Path),
     help="Absolute path to the model's .sql file.",
 )
-def populate(model_name: str, model_path: Path):
+@click.option(
+    "--profiles-dir",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Directory containing profiles.yml. Defaults to DBT_PROFILES_DIR or ~/.dbt/.",
+)
+def populate(model_name: str, model_path: Path, profiles_dir: Path | None):
     """Read the manifest JSON and surgically update schema.yml."""
     model_dir = model_path.parent
     manifest_path = model_dir / f"{model_name}_manifest.json"

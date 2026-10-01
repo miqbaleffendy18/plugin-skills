@@ -19,18 +19,29 @@ def find_project_root(start: Path) -> Path:
     )
 
 
-def get_default_target(project_root: Path) -> dict:
+def get_default_target(project_root: Path, profiles_dir: Path | None = None) -> dict:
     """Return catalog, schema, http_path, and host for the default dbt target.
 
-    Reads dbt_project.yml for the profile name, then reads ~/.dbt/profiles.yml
+    Reads dbt_project.yml for the profile name, then reads profiles.yml
     for the default target's Databricks connection details.
+
+    profiles_dir resolution order (mirrors dbt's own logic):
+      1. profiles_dir argument if provided
+      2. DBT_PROFILES_DIR environment variable
+      3. ~/.dbt/
     """
+    import os
+
     dbt_project = _load_yaml(project_root / "dbt_project.yml")
     profile_name = dbt_project.get("profile")
     if not profile_name:
         raise ValueError("dbt_project.yml is missing a 'profile' key.")
 
-    profiles_path = Path.home() / ".dbt" / "profiles.yml"
+    if profiles_dir is None:
+        env_dir = os.environ.get("DBT_PROFILES_DIR")
+        profiles_dir = Path(env_dir) if env_dir else Path.home() / ".dbt"
+
+    profiles_path = profiles_dir / "profiles.yml"
     if not profiles_path.exists():
         raise FileNotFoundError(f"profiles.yml not found at {profiles_path}.")
 
