@@ -1,15 +1,12 @@
-"""Utilities for querying Databricks via the SDK.
+"""Utilities for querying Databricks via the Databricks CLI.
 
-Authentication is read from ~/.databrickscfg (PAT profile).
-The SQL warehouse is provided by the caller (resolved from dbt profiles.yml).
+Requires the Databricks CLI (v0.200+) installed and configured in ~/.databrickscfg.
 """
 
 from __future__ import annotations
 
-import time
-
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.sql import StatementState
+import json
+import subprocess
 
 
 def get_columns(
@@ -22,14 +19,13 @@ def get_columns(
 
     Returns an empty list if the table does not exist in information_schema.
     """
-    sql = f"""
-        SELECT column_name, data_type
-        FROM {catalog}.information_schema.columns
-        WHERE table_schema = '{schema}'
-          AND table_name   = '{table}'
-        ORDER BY ordinal_position
-    """
-    rows = _execute(sql, warehouse_id, catalog, schema)
+    sql = (
+        f"SELECT column_name, data_type "
+        f"FROM {catalog}.information_schema.columns "
+        f"WHERE table_schema = '{schema}' AND table_name = '{table}' "
+        f"ORDER BY ordinal_position"
+    )
+    rows, _ = _execute(sql, warehouse_id)
     return [{"name": row[0], "data_type": row[1]} for row in rows]
 
 
@@ -42,53 +38,41 @@ def get_samples(
 ) -> list[dict]:
     """Return up to `limit` rows from the table as a list of column->value dicts."""
     sql = f"SELECT * FROM {catalog}.{schema}.{table} LIMIT {limit}"
-    rows = _execute(sql, warehouse_id, catalog, schema)
-
-    # Fetch column names via information_schema to build the dicts
-    cols = get_columns(catalog, schema, table, warehouse_id)
-    col_names = [c["name"] for c in cols]
-
+    rows, col_names = _execute(sql, warehouse_id)
     return [dict(zip(col_names, row)) for row in rows]
 
 
-def _execute(
-    sql: str,
-    warehouse_id: str,
-    catalog: str | None = None,
-    schema: str | None = None,
-) -> list[list]:
-    """Run a SQL statement and return rows as a list of lists."""
-    client = WorkspaceClient()
+def _execute(sql: str, warehouse_id: str) -> tuple[list[list], list[str]]:
+    """Run SQL via the Databricks CLI and return (rows, column_names)."""
+    result = subprocess.run(
+        [
+            "databricks", "sql", "statements", "execute",
+            "--statement", sql,
+            "--warehouse-id", warehouse_id,
+            "--wait-timeout", "50s",
+        ],
+        capture_output=True,
+        text=True,
+    )
 
-    kwargs: dict = {"statement": sql, "warehouse_id": warehouse_id}
-    if catalog:
-        kwargs["catalog"] = catalog
-    if schema:
-        kwargs["schema"] = schema
-
-    response = client.statement_execution.execute_statement(**kwargs)
-
-    # Poll until terminal state
-    statement_id = response.statement_id
-    for _ in range(60):
-        if response.status.state in (
-            StatementState.SUCCEEDED,
-            StatementState.FAILED,
-            StatementState.CANCELED,
-            StatementState.CLOSED,
-        ):
-            break
-        time.sleep(2)
-        response = client.statement_execution.get_statement(statement_id)
-
-    if response.status.state != StatementState.SUCCEEDED:
-        error = response.status.error
+    if result.returncode != 0:
         raise RuntimeError(
-            f"Databricks query failed ({response.status.state}): "
-            f"{error.message if error else 'unknown error'}"
+            f"Databricks CLI error: {result.stderr.strip() or result.stdout.strip()}"
         )
 
-    result = response.result
-    if not result or not result.data_array:
-        return []
-    return result.data_array
+    data = json.loads(result.stdout)
+
+    state = data.get("status", {}).get("state", "")
+    if state != "SUCCEEDED":
+        error = data.get("status", {}).get("error", {})
+        raise RuntimeError(
+            f"Query failed ({state}): {error.get('message', 'unknown error')}"
+        )
+
+    rows = data.get("result", {}).get("data_array") or []
+    col_names = [
+        col["name"]
+        for col in data.get("manifest", {}).get("schema", {}).get("columns", [])
+    ]
+
+    return rows, col_names
