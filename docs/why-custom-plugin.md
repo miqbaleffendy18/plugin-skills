@@ -48,6 +48,61 @@ Building and maintaining a custom plugin has real overhead: version bumps, a hos
 | Corporate environment with non-standard tooling | Build custom |
 | Task is unique to your domain or data model | Build custom |
 
+## How marketplace.json and plugin.json relate
+
+Two separate files, two separate jobs:
+
+```
+marketplace.json  →  points to  →  plugin.json  →  lists  →  SKILL.md (name: field)
+   (registry)              (identity: "name")      (skills[])    (invocation name)
+```
+
+- **`marketplace.json`** is a registry. Its only job is mapping a plugin name to a `source` (where to fetch it from). It has no effect on how a skill is invoked.
+- **`plugin.json`**'s `"name"` field is the slash-command **prefix**. `/zurich-data-team:dbt-schema-enrichment` has `zurich-data-team` because that's the `"name"` in [plugin.json](../.claude-plugin/plugin.json).
+- **`SKILL.md`**'s `name:` frontmatter (not the directory name) is the slash-command **suffix**.
+
+One required consistency rule: `marketplace.json`'s `plugins[].name` must match `plugin.json`'s `"name"` exactly, or install fails with `Plugin "<name>" not found in marketplace`.
+
+### A marketplace can list multiple plugins, from multiple sources
+
+`marketplace.json`'s `plugins` array can hold more than one entry, and each entry's `source` doesn't have to point into the same repo:
+
+| `source` form | Where the plugin lives |
+|---|---|
+| `"./"` or `"./subdir"` | Same repo as the marketplace |
+| `{ "source": "github", "repo": "org/repo" }` | A separate GitHub repo |
+| `{ "source": "git-subdir", "url": "org/monorepo", "path": "tools/plugin" }` | A subdirectory of another repo |
+
+This repo currently co-locates `marketplace.json` and `plugin.json` for simplicity (one plugin, one repo). That's a convenience choice, not a requirement — splitting plugins into separate repos later needs no change to this structure, just new entries in the `plugins` array.
+
+## The conventional plugin folder layout
+
+Confirmed against Anthropic's official docs. Only one file is special-cased by path:
+
+```
+my-plugin/
+├── .claude-plugin/
+│   └── plugin.json          ← required, fixed path
+├── skills/
+│   └── <skill-name>/
+│       └── SKILL.md          ← one folder per skill
+├── commands/                 ← optional
+├── agents/                   ← optional
+├── hooks/                    ← optional
+└── .mcp.json                 ← optional
+```
+
+`plugin.json`'s `"skills"` array must explicitly list each skill directory — Claude Code does not auto-scan `skills/` for folders. This repo's layout (`skills/dbt-schema-enrichment/SKILL.md`, listed in `plugin.json`) follows this convention.
+
+## What's saved locally on install
+
+Two distinct steps, two distinct local effects:
+
+1. `claude plugin marketplace add <repo>` — caches only the marketplace's registry metadata (`marketplace.json`). No plugin files yet.
+2. `claude plugin install <plugin>@<marketplace>` — fetches and caches the plugin's actual files, versioned, typically under `~/.claude/plugins/cache/<marketplace>/<plugin-name>/<version>/`.
+
+This is why `SKILL.md` resolves `TOOLS_SCRIPT` relative to its own base directory rather than a hardcoded path — the cache location varies by OS and user, and the plugin only knows where it ended up at runtime.
+
 ## Things to be aware of before wider rollout
 
 ### Plugins have an always-on context cost
