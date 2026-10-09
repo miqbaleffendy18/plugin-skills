@@ -47,3 +47,29 @@ Building and maintaining a custom plugin has real overhead: version bumps, a hos
 | Team has strong conventions a public skill would violate | Build custom |
 | Corporate environment with non-standard tooling | Build custom |
 | Task is unique to your domain or data model | Build custom |
+
+## Things to be aware of before wider rollout
+
+### Plugins have an always-on context cost
+
+Every installed plugin's skill names and descriptions load into Claude's context on every turn, even in sessions where the skill never runs — this is how Claude knows the skill exists at all. `disable-model-invocation: true` (used here) stops the skill from being auto-triggered, but the name/description still costs a small number of tokens per turn once installed.
+
+### Plugins run with the user's own permissions — no sandboxing
+
+Anything the plugin's scripts do (shell out to `dbt`, read/write files) runs as the installing user, exactly as if they had typed the command themselves. There is no sandbox. This is reasonable for an internal, team-authored plugin, but should be stated explicitly when rolling out to a wider audience.
+
+### Updates are not automatic
+
+Installing a plugin caches a specific version locally. Pushing a new commit does nothing for existing users until they explicitly run `claude plugin update`. This makes consistent version bumps (this plugin went 0.1.3 → 0.1.7 while fixing the Databricks query issues) the actual signal users rely on to know something changed.
+
+### Install scope matters for team rollout
+
+Three scopes are available: **user** (every project on that person's machine), **project** (enabled via committed `.claude/settings.json`, but each person still installs it locally), and **local** (just one repo, one user). For a tool meant to be used across many dbt projects, user scope is the right default — project scope would require installing it per-repo.
+
+### Validation checks structure, not runtime behavior
+
+`claude plugin validate --strict` catches manifest errors (missing fields, bad JSON, naming violations) before every push. It does not catch runtime bugs — for example, it would not have caught the nested-`LIMIT` SQL syntax error found during development. Validation is necessary before shipping a version bump, but not sufficient.
+
+### There's a distribution ladder beyond a private marketplace
+
+A private marketplace (what this repo is) is one tier of distribution. If adoption grows past the immediate team, Anthropic also runs an official plugin directory with its own submission process. Moving from "private marketplace for us" to "listed in Anthropic's directory" is a deliberate step, not something that happens automatically.
